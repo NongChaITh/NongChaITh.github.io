@@ -1,0 +1,100 @@
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f0f0f0;
+    margin: 0;
+}
+
+.container {
+    text-align: center;
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    /* ให้ container ยืดหดได้ตามขนาด Grid */
+    max-width: 90%; 
+    overflow-x: auto;
+}
+
+h1 {
+    color: #333;
+}
+
+.status-panel {
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    flex-wrap: wrap; /* ให้บรรทัดลงได้ถ้าหน้าจอเล็ก */
+    gap: 10px;
+}
+
+#reset-button {
+    padding: 10px 15px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+}
+
+#difficulty-select {
+    padding: 8px;
+    border-radius: 5px;
+}
+
+/* รูปแบบสำหรับตารางเกม */
+.grid-container {
+    display: inline-grid;
+    border: 3px solid #666;
+    margin: 0 auto;
+}
+
+/* รูปแบบสำหรับแต่ละช่อง (Cell) */
+.cell {
+    /* ใช้ขนาดที่เล็กเพื่อให้บอร์ดใหญ่ (Expert) แสดงผลได้ดีขึ้น */
+    width: 20px; 
+    height: 20px;
+    line-height: 20px;
+    border: 1px solid #bbb;
+    background-color: #ccc;
+    cursor: pointer;
+    font-size: 12px; /* ปรับขนาดฟอนต์ให้เข้ากับช่อง */
+    font-weight: bold;
+    text-align: center;
+    user-select: none;
+}
+
+.cell:hover:not(.opened):not(.flagged) {
+    background-color: #ddd;
+}
+
+/* รูปแบบเมื่อช่องถูกเปิดแล้ว */
+.opened {
+    background-color: #eee;
+    border: 1px solid #ddd;
+    cursor: default;
+}
+
+/* รูปแบบสำหรับธงและระเบิด */
+.flagged {
+    background-color: #f0ad4e; 
+}
+
+.mine {
+    background-color: #d9534f; 
+}
+
+/* สีสำหรับตัวเลขบอกจำนวนระเบิด (n1 ถึง n8) */
+.n1 { color: blue; }
+.n2 { color: green; }
+.n3 { color: red; }
+.n4 { color: darkblue; }
+.n5 { color: brown; }
+.n6 { color: cyan; }
+.n7 { color: black; }
+.n8 { color: gray; }
