@@ -13,15 +13,16 @@ let board = [];
 let isGameOver = false;
 let cellsRevealed = 0; 
 let isFirstClick = true; 
-let flagsPlaced = 0; // 🚩 เพิ่มตัวแปรนับจำนวนธงที่ปักแล้ว
+let flagsPlaced = 0; 
 
 // ตัวแปรสำหรับจัดการเวลา
 let timerInterval; 
 let secondsElapsed = 0; 
 
 // ตัวแปรสำหรับจัดการ Touch Events บนมือถือ
-let touchStartTimer; // ตัวจับเวลาสำหรับ Long Press
+let touchStartTimer; 
 const LONG_PRESS_THRESHOLD = 500; // 500 มิลลิวินาที (ครึ่งวินาที)
+let isLongPress = false; // 🚩 เพิ่ม: สถานะเพื่อระบุว่า Long Press ได้ถูกกระตุ้นแล้ว
 
 // DOM Elements
 const gridContainer = document.getElementById('grid-container');
@@ -47,26 +48,45 @@ difficultySelect.addEventListener('change', initializeGame);
  * เริ่มตัวจับเวลาสำหรับการกดค้าง
  */
 function handleTouchStart(event) {
-    // ป้องกันการเกิดเหตุการณ์ default ของเบราว์เซอร์
-    event.preventDefault(); 
+    // 🚩 ลบ event.preventDefault() ออกเพื่อให้ click event ทำงานตามปกติบน PC
+    
+    isLongPress = false; 
 
     // ล้างตัวจับเวลาเก่า (ถ้ามี)
     clearTimeout(touchStartTimer);
 
     // เริ่มตัวจับเวลาใหม่
     touchStartTimer = setTimeout(() => {
-        // เมื่อครบเวลา Long Press ให้เรียกฟังก์ชัน Long Press
+        isLongPress = true; // 🚩 ตั้งค่าสถานะ Long Press
         handleLongPress(event);
     }, LONG_PRESS_THRESHOLD);
 }
 
 /**
  * จัดการเมื่อสิ้นสุดการสัมผัส (touchend)
- * หากปล่อยนิ้วก่อนเวลา Long Press จะถือเป็นการคลิกซ้ายปกติ (click event จะทำงานเอง)
+ * หากเป็นการแตะสั้น (ไม่ใช่ Long Press) ให้จำลองการคลิกซ้าย
  */
 function handleTouchEnd(event) {
     // หยุดตัวจับเวลา Long Press
     clearTimeout(touchStartTimer);
+    
+    // 🚩 โค้ดที่สำคัญ: ถ้าไม่ได้เกิด Long Press (เป็นการแตะสั้น)
+    if (!isLongPress) {
+        // ป้องกัน click event ที่ไม่ต้องการจากเบราว์เซอร์
+        event.preventDefault(); 
+        
+        // 🚩 จำลองการเรียกใช้ handleCellClick
+        const cellElement = event.target;
+        if (cellElement && cellElement.classList.contains('cell')) {
+            const simulatedEvent = { 
+                target: cellElement,
+                preventDefault: () => {}
+            };
+            handleCellClick(simulatedEvent);
+        }
+    }
+    
+    isLongPress = false; // รีเซ็ตสถานะ
 }
 
 /**
@@ -74,8 +94,8 @@ function handleTouchEnd(event) {
  * จำลองการคลิกขวา (ปักธง)
  */
 function handleLongPress(event) {
-    // ป้องกันการเกิดเหตุการณ์อื่น ๆ
-    event.preventDefault();
+    // 🚩 สำคัญ: เรียก event.preventDefault() ที่นี่เท่านั้น เพื่อป้องกันการคลิกซ้ายตามมา
+    event.preventDefault(); 
 
     // หากมีการแตะหลายจุด ให้ใช้จุดแรก
     const touch = event.changedTouches[0];
@@ -87,7 +107,6 @@ function handleLongPress(event) {
         // สร้าง Object เพื่อจำลองเหตุการณ์สำหรับฟังก์ชัน handleCellRightClick
         const simulatedEvent = { 
             target: cellElement,
-            // ป้องกันการทำงาน default ของ contextmenu จากเบราว์เซอร์
             preventDefault: () => { event.preventDefault(); } 
         };
 
@@ -115,7 +134,6 @@ function startTimer() {
              secondsElapsed = 999;
              stopTimer();
         }
-        // 🚩 ปรับการแสดงผลให้สอดคล้องกับรูปแบบ Timer: 000
         timerDisplay.textContent = `Timer: ${secondsElapsed.toString().padStart(3, '0')}`;
     }, 1000); 
 }
@@ -136,9 +154,7 @@ function stopTimer() {
  * อัปเดตการแสดงผลจำนวนระเบิดที่เหลืออยู่ (Mines - Flags)
  */
 function updateMinesDisplay() {
-    // จำนวนระเบิดที่เหลือ = จำนวนระเบิดทั้งหมด - จำนวนธงที่ปักแล้ว
     const minesLeft = currentSettings.mines - flagsPlaced;
-    // 🚩 ปรับการแสดงผลให้สอดคล้องกับรูปแบบ Mines: 010
     minesCountDisplay.textContent = `Mines: ${minesLeft.toString().padStart(3, '0')}`;
 }
 
@@ -152,26 +168,20 @@ function initializeGame() {
     isGameOver = false;
     cellsRevealed = 0;
     isFirstClick = true; 
-    flagsPlaced = 0; // 🚩 รีเซ็ตจำนวนธงที่ปัก
+    flagsPlaced = 0; 
     
-    // 1. ดึงการตั้งค่าความยากจาก Dropdown
     const selectedDifficulty = difficultySelect.value;
     currentSettings = DIFFICULTY_SETTINGS[selectedDifficulty];
 
-    // หยุดตัวจับเวลาเดิมและรีเซ็ตค่า
     stopTimer();
     secondsElapsed = 0;
     timerDisplay.textContent = "Timer: 000"; 
     
-    // 2. สร้างตารางเปล่าๆ (ยังไม่มีระเบิด)
     board = createEmptyBoard(currentSettings.size); 
     
-    // 3. สร้าง UI Grid
     renderGrid();
     
-    // อัปเดตสถานะการแสดงผล
     gameStatus.textContent = "Status: Playing";
-    // 🚩 เรียกใช้ฟังก์ชันใหม่เพื่ออัปเดตจำนวนระเบิดเริ่มต้น
     updateMinesDisplay(); 
 }
 
@@ -254,7 +264,6 @@ function calculateNeighborMines(board, size) {
  */
 function renderGrid() {
     gridContainer.innerHTML = ''; 
-    // ใช้ขนาดบอร์ดปัจจุบันในการกำหนด Grid Template
     gridContainer.style.gridTemplateColumns = `repeat(${currentSettings.size}, 1fr)`;
 
     for (let r = 0; r < currentSettings.size; r++) {
@@ -264,11 +273,11 @@ function renderGrid() {
             cellElement.dataset.row = r;
             cellElement.dataset.col = c;
             
-            // ผูกเหตุการณ์ PC: คลิกซ้าย/ขวา
+            // ผูกเหตุการณ์ PC: คลิกซ้าย/ขวา (click event จะทำงานบนมือถือเฉพาะเมื่อ touchend ไม่ถูก preventDefault)
             cellElement.addEventListener('click', handleCellClick);
             cellElement.addEventListener('contextmenu', handleCellRightClick); 
             
-            // 🚩 เพิ่ม: ผูกเหตุการณ์มือถือ: กดค้าง (Long Press)
+            // ผูกเหตุการณ์มือถือ
             cellElement.addEventListener('touchstart', handleTouchStart);
             cellElement.addEventListener('touchend', handleTouchEnd);
             
@@ -282,27 +291,21 @@ function renderGrid() {
  */
 function handleCellClick(event) {
     if (isGameOver) return;
-
+    // event.target อาจเป็น cellElement ที่จำลองมาจาก handleTouchEnd หรือจาก PC click event
     const r = parseInt(event.target.dataset.row);
     const c = parseInt(event.target.dataset.col);
     const cell = board[r][c];
 
-    // 🚩 ตรวจสอบว่าช่องถูกปักธงไว้หรือไม่
     if (cell.isRevealed || cell.isFlagged) return; 
 
     // **ตรรกะการคลิกครั้งแรก (Safe First Click)**
     if (isFirstClick) {
-        // 1. วางระเบิดและคำนวณตัวเลข โดยใช้การตั้งค่าปัจจุบัน
         placeMinesAndCalculate(board, currentSettings.size, currentSettings.mines, r, c);
-        
-        // 2. เริ่มตัวจับเวลา
         startTimer();
-        
-        // 3. ตั้งค่าสถานะการคลิก
         isFirstClick = false; 
     }
 
-    // 1. ช่องเป็นระเบิด (ไม่ควรเกิดในการคลิกครั้งแรก)
+    // 1. ช่องเป็นระเบิด
     if (cell.isMine) {
         cell.isRevealed = true;
         gameOver(false); 
@@ -333,7 +336,6 @@ function handleCellRightClick(event) {
 
     cell.isFlagged = !cell.isFlagged;
     
-    // 🚩 อัปเดตจำนวนธงที่ปักแล้ว
     if (cell.isFlagged) {
         flagsPlaced++;
         cellElement.textContent = '🚩';
@@ -344,7 +346,6 @@ function handleCellRightClick(event) {
     
     cellElement.classList.toggle('flagged', cell.isFlagged);
     
-    // 🚩 อัปเดตการแสดงผลจำนวนระเบิดที่เหลือ
     updateMinesDisplay(); 
 }
 
@@ -352,20 +353,19 @@ function handleCellRightClick(event) {
  * ฟังก์ชันเปิดช่องหลัก (ใช้ Recusrion สำหรับช่องว่าง)
  */
 function revealCell(r, c) {
-    // ใช้ขนาดบอร์ดปัจจุบันในการตรวจสอบขอบเขต
     if (r < 0 || r >= currentSettings.size || c < 0 || c >= currentSettings.size) return; 
     
     const cell = board[r][c];
     if (cell.isRevealed || cell.isMine) return;
     
-    // 🚩 ถ้าช่องถูกปักธงไว้ (isFlagged) ให้ถอนธงออกก่อนเปิด
+    // ถ้าช่องถูกปักธงไว้ (isFlagged) ให้ถอนธงออกก่อนเปิด
     if (cell.isFlagged) {
-        cell.isFlagged = false; // ถอนธง
-        flagsPlaced--; // ลดจำนวนธง
+        cell.isFlagged = false; 
+        flagsPlaced--; 
         const cellElement = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
         cellElement.classList.remove('flagged');
         cellElement.textContent = '';
-        updateMinesDisplay(); // อัปเดตการแสดงผล
+        updateMinesDisplay(); 
     }
 
     cell.isRevealed = true;
@@ -396,7 +396,6 @@ function revealCell(r, c) {
 function gameOver(hasWon) {
     isGameOver = true;
     stopTimer(); 
-    // ปิดการคลิกเมื่อเกมจบ
     gridContainer.style.pointerEvents = 'none'; 
     
     if (hasWon) {
@@ -410,7 +409,6 @@ function gameOver(hasWon) {
  * ตรวจสอบเงื่อนไขชัยชนะ: เปิดช่องที่ไม่ใช่ระเบิดครบทั้งหมด
  */
 function checkWin() {
-    // ใช้ขนาดบอร์ดและจำนวนระเบิดปัจจุบัน
     const requiredRevealed = (currentSettings.size * currentSettings.size) - currentSettings.mines;
 
     if (cellsRevealed === requiredRevealed) {
@@ -422,13 +420,12 @@ function checkWin() {
  * เปิดเผยตำแหน่งระเบิดทั้งหมดเมื่อเกมจบ
  */
 function revealAllMines() {
-    // ใช้ขนาดบอร์ดปัจจุบัน
     for (let r = 0; r < currentSettings.size; r++) {
         for (let c = 0; c < currentSettings.size; c++) {
             const cell = board[r][c];
             if (cell.isMine) {
                 const cellElement = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
-                cellElement.classList.remove('flagged'); // เอาธงออกถ้ามี
+                cellElement.classList.remove('flagged'); 
                 cellElement.classList.add('opened', 'mine');
                 cellElement.textContent = '💣';
             }
