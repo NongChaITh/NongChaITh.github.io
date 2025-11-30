@@ -13,6 +13,7 @@ let board = [];
 let isGameOver = false;
 let cellsRevealed = 0; 
 let isFirstClick = true; 
+let flagsPlaced = 0; // 🚩 เพิ่มตัวแปรนับจำนวนธงที่ปักแล้ว
 
 // ตัวแปรสำหรับจัดการเวลา
 let timerInterval; 
@@ -22,7 +23,8 @@ let secondsElapsed = 0;
 const gridContainer = document.getElementById('grid-container');
 const resetButton = document.getElementById('reset-button');
 const gameStatus = document.getElementById('game-status');
-const minesCountDisplay = document.getElementById('mines-count');
+// 🚩 แก้ไขชื่อ id ให้ตรงกับ index.html ใหม่
+const minesCountDisplay = document.getElementById('mines-count-display'); 
 const timerDisplay = document.getElementById('timer-display');
 const difficultySelect = document.getElementById('difficulty-select'); 
 
@@ -51,6 +53,7 @@ function startTimer() {
              secondsElapsed = 999;
              stopTimer();
         }
+        // 🚩 ปรับการแสดงผลให้สอดคล้องกับรูปแบบ Timer: 000
         timerDisplay.textContent = `Timer: ${secondsElapsed.toString().padStart(3, '0')}`;
     }, 1000); 
 }
@@ -68,6 +71,17 @@ function stopTimer() {
 // ------------------------------------------------------------------
 
 /**
+ * อัปเดตการแสดงผลจำนวนระเบิดที่เหลืออยู่ (Mines - Flags)
+ */
+function updateMinesDisplay() {
+    // จำนวนระเบิดที่เหลือ = จำนวนระเบิดทั้งหมด - จำนวนธงที่ปักแล้ว
+    const minesLeft = currentSettings.mines - flagsPlaced;
+    // 🚩 ปรับการแสดงผลให้สอดคล้องกับรูปแบบ Mines: 010
+    minesCountDisplay.textContent = `Mines: ${minesLeft.toString().padStart(3, '0')}`;
+}
+
+
+/**
  * ฟังก์ชันหลักในการเริ่มต้นเกมและตั้งค่าใหม่
  */
 function initializeGame() {
@@ -77,6 +91,7 @@ function initializeGame() {
     isGameOver = false;
     cellsRevealed = 0;
     isFirstClick = true; 
+    flagsPlaced = 0; // 🚩 รีเซ็ตจำนวนธงที่ปัก
     
     // 1. ดึงการตั้งค่าความยากจาก Dropdown
     const selectedDifficulty = difficultySelect.value;
@@ -95,7 +110,8 @@ function initializeGame() {
     
     // อัปเดตสถานะการแสดงผล
     gameStatus.textContent = "Status: Playing";
-    minesCountDisplay.textContent = `Bomb: ${currentSettings.mines}`; 
+    // 🚩 เรียกใช้ฟังก์ชันใหม่เพื่ออัปเดตจำนวนระเบิดเริ่มต้น
+    updateMinesDisplay(); 
 }
 
 /**
@@ -205,6 +221,7 @@ function handleCellClick(event) {
     const c = parseInt(event.target.dataset.col);
     const cell = board[r][c];
 
+    // 🚩 ตรวจสอบว่าช่องถูกปักธงไว้หรือไม่
     if (cell.isRevealed || cell.isFlagged) return; 
 
     // **ตรรกะการคลิกครั้งแรก (Safe First Click)**
@@ -249,8 +266,20 @@ function handleCellRightClick(event) {
     if (cell.isRevealed) return; 
 
     cell.isFlagged = !cell.isFlagged;
+    
+    // 🚩 อัปเดตจำนวนธงที่ปักแล้ว
+    if (cell.isFlagged) {
+        flagsPlaced++;
+        cellElement.textContent = '🚩';
+    } else {
+        flagsPlaced--;
+        cellElement.textContent = '';
+    }
+    
     cellElement.classList.toggle('flagged', cell.isFlagged);
-    cellElement.textContent = cell.isFlagged ? '🚩' : '';
+    
+    // 🚩 อัปเดตการแสดงผลจำนวนระเบิดที่เหลือ
+    updateMinesDisplay(); 
 }
 
 /**
@@ -261,7 +290,17 @@ function revealCell(r, c) {
     if (r < 0 || r >= currentSettings.size || c < 0 || c >= currentSettings.size) return; 
     
     const cell = board[r][c];
-    if (cell.isRevealed || cell.isMine || cell.isFlagged) return;
+    if (cell.isRevealed || cell.isMine) return;
+    
+    // 🚩 ถ้าช่องถูกปักธงไว้ (isFlagged) จะไม่เปิดช่อง แต่จะถอนธงออกก่อน
+    if (cell.isFlagged) {
+        cell.isFlagged = false; // ถอนธง
+        flagsPlaced--; // ลดจำนวนธง
+        const cellElement = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+        cellElement.classList.remove('flagged');
+        cellElement.textContent = '';
+        updateMinesDisplay(); // อัปเดตการแสดงผล
+    }
 
     cell.isRevealed = true;
     cellsRevealed++;
@@ -323,6 +362,7 @@ function revealAllMines() {
             const cell = board[r][c];
             if (cell.isMine) {
                 const cellElement = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                cellElement.classList.remove('flagged'); // เอาธงออกถ้ามี
                 cellElement.classList.add('opened', 'mine');
                 cellElement.textContent = '💣';
             }
