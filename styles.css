@@ -1,40 +1,55 @@
 body {
     font-family: Arial, sans-serif;
+    /* จัดกึ่งกลางทั้งแนวตั้งและแนวนอน */
     display: flex;
     justify-content: center;
     align-items: center;
+    /* ใช้ min-height 100vh เพื่อให้เต็มจอในแนวตั้งบนมือถือ */
     min-height: 100vh;
     background-color: #f0f0f0;
     margin: 0;
+    padding: 10px; 
+    box-sizing: border-box;
 }
 
 .container {
     text-align: center;
     background: #ffffff;
-    padding: 20px;
+    padding: 15px; 
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    /* ให้ container ยืดหดได้ตามขนาด Grid */
-    max-width: 90%; 
+    /* ให้ container กว้างได้ถึง 98% ของ Viewport และจำกัดขนาดสูงสุด */
+    width: 98vw; 
+    max-width: 1000px; 
     overflow-x: auto;
+    box-sizing: border-box; 
 }
 
 h1 {
     color: #333;
+    font-size: 1.5em; 
 }
 
 .status-panel {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
     display: flex;
-    justify-content: space-around;
+    /* จัดชิดซ้าย-ขวา และให้บรรทัดลงได้เมื่อจอเล็ก */
+    justify-content: space-between; 
     align-items: center;
-    flex-wrap: wrap; /* ให้บรรทัดลงได้ถ้าหน้าจอเล็ก */
-    gap: 10px;
+    flex-wrap: wrap; 
+    gap: 8px; 
+    font-size: 0.9em;
+}
+
+/* จัดการความกว้างขององค์ประกอบใน status-panel บนจอใหญ่ */
+.status-panel > * {
+    flex-grow: 1; 
+    min-width: 100px; 
 }
 
 #reset-button {
-    padding: 10px 15px;
-    font-size: 16px;
+    padding: 8px 10px; 
+    font-size: 14px;
     cursor: pointer;
     background-color: #4CAF50;
     color: white;
@@ -43,7 +58,7 @@ h1 {
 }
 
 #difficulty-select {
-    padding: 8px;
+    padding: 6px;
     border-radius: 5px;
 }
 
@@ -51,22 +66,35 @@ h1 {
 .grid-container {
     display: inline-grid;
     border: 3px solid #666;
-    margin: 0 auto;
+    margin: 10px auto;
+    max-width: 100%; 
+    overflow: hidden;
 }
 
 /* รูปแบบสำหรับแต่ละช่อง (Cell) */
 .cell {
-    /* ใช้ขนาดที่เล็กเพื่อให้บอร์ดใหญ่ (Expert) แสดงผลได้ดีขึ้น */
-    width: 20px; 
-    height: 20px;
-    line-height: 20px;
+    /* **Responsive Unit:** ใช้ vw (Viewport Width) */
+    width: 1.8vw; 
+    height: 1.8vw;
+    line-height: 1.8vw;
+    
+    /* จำกัดขนาดขั้นต่ำและสูงสุดสำหรับจอต่างๆ */
+    min-width: 12px; 
+    min-height: 12px;
+    max-width: 20px; 
+    max-height: 20px;
+
     border: 1px solid #bbb;
     background-color: #ccc;
     cursor: pointer;
-    font-size: 12px; /* ปรับขนาดฟอนต์ให้เข้ากับช่อง */
+    font-size: 1.1vw; 
     font-weight: bold;
     text-align: center;
     user-select: none;
+    /* จัดข้อความ/สัญลักษณ์ให้อยู่กึ่งกลางจริงๆ */
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .cell:hover:not(.opened):not(.flagged) {
@@ -98,3 +126,51 @@ h1 {
 .n6 { color: cyan; }
 .n7 { color: black; }
 .n8 { color: gray; }
+
+/* ------------------------------------------------------------------ */
+/* Media Query สำหรับหน้าจอขนาดเล็ก (Mobile First Adjustments) */
+/* ------------------------------------------------------------------ */
+@media (max-width: 600px) {
+    body {
+        padding: 5px;
+    }
+    
+    .container {
+        width: 100%;
+        padding: 10px 5px;
+        box-shadow: none; 
+    }
+
+    .status-panel {
+        /* จัดวางให้ Timer และ Mines Count อยู่ในบรรทัดเดียวกัน */
+        justify-content: space-between;
+        gap: 5px;
+        font-size: 0.9em;
+    }
+
+    /* จัดกลุ่ม Dropdown/Timer/Mines/Reset ให้อยู่ในแถวเดียวกันเมื่อเป็นจอเล็ก */
+    .status-panel > * {
+        flex-basis: 48%; /* ให้แต่ละรายการกินพื้นที่ประมาณครึ่งนึง */
+        min-width: unset;
+        font-size: 0.9em;
+    }
+    
+    /* ให้ Status และ Reset button อยู่คนละแถวและเต็มความกว้าง */
+    #game-status, #reset-button {
+        flex-basis: 100%; 
+    }
+
+    /* **การปรับขนาด Cell สำหรับมือถือ:** */
+    .cell {
+        /* เปลี่ยนไปใช้ขนาดใหญ่ขึ้น (เช่น 4vw) เพื่อให้แตะได้ง่าย */
+        width: 4vw; 
+        height: 4vw;
+        line-height: 4vw;
+        /* ปรับขนาดฟอนต์ให้ใหญ่ขึ้น */
+        font-size: 3vw; 
+        
+        /* ยกเลิก Max-width/Max-height เพื่อให้ขนาด vw ทำงานได้เต็มที่ */
+        max-width: unset;
+        max-height: unset;
+    }
+}
