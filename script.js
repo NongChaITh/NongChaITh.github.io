@@ -19,11 +19,14 @@ let flagsPlaced = 0; // 🚩 เพิ่มตัวแปรนับจำน
 let timerInterval; 
 let secondsElapsed = 0; 
 
+// ตัวแปรสำหรับจัดการ Touch Events บนมือถือ
+let touchStartTimer; // ตัวจับเวลาสำหรับ Long Press
+const LONG_PRESS_THRESHOLD = 500; // 500 มิลลิวินาที (ครึ่งวินาที)
+
 // DOM Elements
 const gridContainer = document.getElementById('grid-container');
 const resetButton = document.getElementById('reset-button');
 const gameStatus = document.getElementById('game-status');
-// 🚩 แก้ไขชื่อ id ให้ตรงกับ index.html ใหม่
 const minesCountDisplay = document.getElementById('mines-count-display'); 
 const timerDisplay = document.getElementById('timer-display');
 const difficultySelect = document.getElementById('difficulty-select'); 
@@ -34,6 +37,65 @@ window.onload = initializeGame;
 // ผูกเหตุการณ์
 resetButton.addEventListener('click', initializeGame);
 difficultySelect.addEventListener('change', initializeGame);
+
+// ------------------------------------------------------------------
+// ฟังก์ชันจัดการ Touch Events (สำหรับมือถือ)
+// ------------------------------------------------------------------
+
+/**
+ * จัดการเมื่อเริ่มสัมผัส (touchstart)
+ * เริ่มตัวจับเวลาสำหรับการกดค้าง
+ */
+function handleTouchStart(event) {
+    // ป้องกันการเกิดเหตุการณ์ default ของเบราว์เซอร์
+    event.preventDefault(); 
+
+    // ล้างตัวจับเวลาเก่า (ถ้ามี)
+    clearTimeout(touchStartTimer);
+
+    // เริ่มตัวจับเวลาใหม่
+    touchStartTimer = setTimeout(() => {
+        // เมื่อครบเวลา Long Press ให้เรียกฟังก์ชัน Long Press
+        handleLongPress(event);
+    }, LONG_PRESS_THRESHOLD);
+}
+
+/**
+ * จัดการเมื่อสิ้นสุดการสัมผัส (touchend)
+ * หากปล่อยนิ้วก่อนเวลา Long Press จะถือเป็นการคลิกซ้ายปกติ (click event จะทำงานเอง)
+ */
+function handleTouchEnd(event) {
+    // หยุดตัวจับเวลา Long Press
+    clearTimeout(touchStartTimer);
+}
+
+/**
+ * จัดการเมื่อเกิดการกดค้าง (Long Press)
+ * จำลองการคลิกขวา (ปักธง)
+ */
+function handleLongPress(event) {
+    // ป้องกันการเกิดเหตุการณ์อื่น ๆ
+    event.preventDefault();
+
+    // หากมีการแตะหลายจุด ให้ใช้จุดแรก
+    const touch = event.changedTouches[0];
+    
+    // ค้นหา Element ที่อยู่ภายใต้จุดที่สัมผัส
+    const cellElement = document.elementFromPoint(touch.clientX, touch.clientY);
+
+    if (cellElement && cellElement.classList.contains('cell')) {
+        // สร้าง Object เพื่อจำลองเหตุการณ์สำหรับฟังก์ชัน handleCellRightClick
+        const simulatedEvent = { 
+            target: cellElement,
+            // ป้องกันการทำงาน default ของ contextmenu จากเบราว์เซอร์
+            preventDefault: () => { event.preventDefault(); } 
+        };
+
+        // เรียกฟังก์ชันปักธง
+        handleCellRightClick(simulatedEvent);
+    }
+}
+
 
 // ------------------------------------------------------------------
 // ฟังก์ชันจัดการเวลา
@@ -85,7 +147,6 @@ function updateMinesDisplay() {
  * ฟังก์ชันหลักในการเริ่มต้นเกมและตั้งค่าใหม่
  */
 function initializeGame() {
-    // 🚩 การแก้ไข: ย้ายมาเป็นบรรทัดแรกๆ เพื่อรีเซ็ต pointer-events ทันที
     gridContainer.style.pointerEvents = 'auto'; 
     
     isGameOver = false;
@@ -203,8 +264,13 @@ function renderGrid() {
             cellElement.dataset.row = r;
             cellElement.dataset.col = c;
             
+            // ผูกเหตุการณ์ PC: คลิกซ้าย/ขวา
             cellElement.addEventListener('click', handleCellClick);
             cellElement.addEventListener('contextmenu', handleCellRightClick); 
+            
+            // 🚩 เพิ่ม: ผูกเหตุการณ์มือถือ: กดค้าง (Long Press)
+            cellElement.addEventListener('touchstart', handleTouchStart);
+            cellElement.addEventListener('touchend', handleTouchEnd);
             
             gridContainer.appendChild(cellElement);
         }
@@ -292,7 +358,7 @@ function revealCell(r, c) {
     const cell = board[r][c];
     if (cell.isRevealed || cell.isMine) return;
     
-    // 🚩 ถ้าช่องถูกปักธงไว้ (isFlagged) จะไม่เปิดช่อง แต่จะถอนธงออกก่อน
+    // 🚩 ถ้าช่องถูกปักธงไว้ (isFlagged) ให้ถอนธงออกก่อนเปิด
     if (cell.isFlagged) {
         cell.isFlagged = false; // ถอนธง
         flagsPlaced--; // ลดจำนวนธง
