@@ -13,15 +13,11 @@ let board = [];
 let isGameOver = false;
 let cellsRevealed = 0; 
 let isFirstClick = true; 
-let flagsPlaced = 0; // 🚩 เพิ่มตัวแปรนับจำนวนธงที่ปักแล้ว
+let flagsPlaced = 0; // ตัวแปรนับจำนวนธงที่ปักแล้ว
 
 // ตัวแปรสำหรับจัดการเวลา
 let timerInterval; 
 let secondsElapsed = 0; 
-
-// ตัวแปรสำหรับจัดการ Touch Events บนมือถือ
-let touchStartTimer; // ตัวจับเวลาสำหรับ Long Press
-const LONG_PRESS_THRESHOLD = 500; // 500 มิลลิวินาที (ครึ่งวินาที)
 
 // DOM Elements
 const gridContainer = document.getElementById('grid-container');
@@ -31,6 +27,12 @@ const minesCountDisplay = document.getElementById('mines-count-display');
 const timerDisplay = document.getElementById('timer-display');
 const difficultySelect = document.getElementById('difficulty-select'); 
 
+// 🚩 DOM Elements สำหรับ Action Menu
+const actionMenu = document.getElementById('action-menu');
+const menuFlagButton = document.getElementById('menu-flag');
+const menuDigButton = document.getElementById('menu-dig');
+let currentMenuCell = null; // เก็บข้อมูลช่องที่เมนูถูกแสดงอยู่
+
 // เริ่มต้นเกมเมื่อโหลดหน้า
 window.onload = initializeGame;
 
@@ -38,60 +40,93 @@ window.onload = initializeGame;
 resetButton.addEventListener('click', initializeGame);
 difficultySelect.addEventListener('change', initializeGame);
 
+// 🚩 ผูกเหตุการณ์สำหรับปุ่มในเมนู
+menuFlagButton.addEventListener('click', handleMenuAction);
+menuDigButton.addEventListener('click', handleMenuAction);
+// ผูกเหตุการณ์นอกเมนู: ซ่อนเมนูเมื่อคลิกที่อื่น
+document.addEventListener('click', hideActionMenu);
+
+
 // ------------------------------------------------------------------
-// ฟังก์ชันจัดการ Touch Events (สำหรับมือถือ)
+// 🚩 ฟังก์ชันจัดการ Action Menu และ Mobile Click
 // ------------------------------------------------------------------
 
 /**
- * จัดการเมื่อเริ่มสัมผัส (touchstart)
- * เริ่มตัวจับเวลาสำหรับการกดค้าง
+ * ตรวจสอบว่าเป็นอุปกรณ์มือถือหรือไม่
  */
-function handleTouchStart(event) {
-    // ป้องกันการเกิดเหตุการณ์ default ของเบราว์เซอร์
-    event.preventDefault(); 
-
-    // ล้างตัวจับเวลาเก่า (ถ้ามี)
-    clearTimeout(touchStartTimer);
-
-    // เริ่มตัวจับเวลาใหม่
-    touchStartTimer = setTimeout(() => {
-        // เมื่อครบเวลา Long Press ให้เรียกฟังก์ชัน Long Press
-        handleLongPress(event);
-    }, LONG_PRESS_THRESHOLD);
+function isMobileDevice() {
+    return /Mobi|Android|iPhone|iPad|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
 /**
- * จัดการเมื่อสิ้นสุดการสัมผัส (touchend)
- * หากปล่อยนิ้วก่อนเวลา Long Press จะถือเป็นการคลิกซ้ายปกติ (click event จะทำงานเอง)
+ * แสดงเมนู Action Menu ที่พิกัดของช่อง
  */
-function handleTouchEnd(event) {
-    // หยุดตัวจับเวลา Long Press
-    clearTimeout(touchStartTimer);
-}
+function showActionMenu(r, c, event) {
+    const cellElement = event.target;
+    currentMenuCell = { r, c, cellElement };
 
-/**
- * จัดการเมื่อเกิดการกดค้าง (Long Press)
- * จำลองการคลิกขวา (ปักธง)
- */
-function handleLongPress(event) {
-    // ป้องกันการเกิดเหตุการณ์อื่น ๆ
-    event.preventDefault();
-
-    // หากมีการแตะหลายจุด ให้ใช้จุดแรก
-    const touch = event.changedTouches[0];
+    // 1. กำหนดตำแหน่งของเมนู (ใช้ Bounding Box ของ Cell)
+    const rect = cellElement.getBoundingClientRect();
     
-    // ค้นหา Element ที่อยู่ภายใต้จุดที่สัมผัส
-    const cellElement = document.elementFromPoint(touch.clientX, touch.clientY);
+    // ตั้งค่าตำแหน่งให้อยู่กลาง Cell หรือด้านล่าง/ขวาเล็กน้อย
+    // และปรับให้อยู่ภายใน Viewport (ใช้ window.scrollY/X)
+    const menuWidth = 200; // กะความกว้างของเมนู
+    const menuHeight = 50; // กะความสูงของเมนู
 
-    if (cellElement && cellElement.classList.contains('cell')) {
-        // สร้าง Object เพื่อจำลองเหตุการณ์สำหรับฟังก์ชัน handleCellRightClick
-        const simulatedEvent = { 
-            target: cellElement,
-            // ป้องกันการทำงาน default ของ contextmenu จากเบราว์เซอร์
-            preventDefault: () => { event.preventDefault(); } 
-        };
+    let leftPos = rect.left + rect.width / 2 - (menuWidth / 2);
+    let topPos = rect.top + rect.height + window.scrollY;
 
-        // เรียกฟังก์ชันปักธง
+    // ปรับให้เมนูไม่เกินขอบขวา
+    if (leftPos + menuWidth > window.innerWidth) {
+        leftPos = window.innerWidth - menuWidth - 10;
+    }
+    // ปรับให้เมนูไม่เกินขอบซ้าย
+    if (leftPos < 0) {
+        leftPos = 10;
+    }
+
+    actionMenu.style.left = `${leftPos}px`;
+    actionMenu.style.top = `${topPos}px`; 
+
+    // 2. แสดงเมนู
+    actionMenu.style.display = 'flex';
+}
+
+/**
+ * ซ่อนเมนู Action Menu
+ */
+function hideActionMenu(event) {
+    // ซ่อนเมื่อคลิกที่อื่นที่ไม่ใช่ปุ่มในเมนู
+    if (event && actionMenu.contains(event.target)) {
+        return; // ไม่ต้องซ่อนถ้าคลิกภายในเมนู
+    }
+    actionMenu.style.display = 'none';
+    currentMenuCell = null;
+}
+
+/**
+ * จัดการเมื่อมีการคลิกที่ปุ่มใน Action Menu
+ */
+function handleMenuAction(event) {
+    if (!currentMenuCell) return;
+
+    // ต้องซ่อนเมนูก่อนเสมอ
+    hideActionMenu(); 
+
+    const action = event.target.dataset.action;
+    const { r, c, cellElement } = currentMenuCell;
+
+    // สร้าง event จำลองเพื่อส่งไปยังฟังก์ชันเดิม
+    const simulatedEvent = {
+        target: cellElement,
+        preventDefault: () => {} // Dummy preventDefault
+    };
+
+    if (action === 'dig') {
+        // จำลองการคลิกซ้าย
+        handleCellClick(simulatedEvent);
+    } else if (action === 'flag') {
+        // จำลองการคลิกขวา
         handleCellRightClick(simulatedEvent);
     }
 }
@@ -115,7 +150,7 @@ function startTimer() {
              secondsElapsed = 999;
              stopTimer();
         }
-        // 🚩 ปรับการแสดงผลให้สอดคล้องกับรูปแบบ Timer: 000
+        // ปรับการแสดงผลให้สอดคล้องกับรูปแบบ Timer: 000
         timerDisplay.textContent = `Timer: ${secondsElapsed.toString().padStart(3, '0')}`;
     }, 1000); 
 }
@@ -138,7 +173,7 @@ function stopTimer() {
 function updateMinesDisplay() {
     // จำนวนระเบิดที่เหลือ = จำนวนระเบิดทั้งหมด - จำนวนธงที่ปักแล้ว
     const minesLeft = currentSettings.mines - flagsPlaced;
-    // 🚩 ปรับการแสดงผลให้สอดคล้องกับรูปแบบ Mines: 010
+    // ปรับการแสดงผลให้สอดคล้องกับรูปแบบ Mines: 010
     minesCountDisplay.textContent = `Mines: ${minesLeft.toString().padStart(3, '0')}`;
 }
 
@@ -152,7 +187,7 @@ function initializeGame() {
     isGameOver = false;
     cellsRevealed = 0;
     isFirstClick = true; 
-    flagsPlaced = 0; // 🚩 รีเซ็ตจำนวนธงที่ปัก
+    flagsPlaced = 0; // รีเซ็ตจำนวนธงที่ปัก
     
     // 1. ดึงการตั้งค่าความยากจาก Dropdown
     const selectedDifficulty = difficultySelect.value;
@@ -171,7 +206,7 @@ function initializeGame() {
     
     // อัปเดตสถานะการแสดงผล
     gameStatus.textContent = "Status: Playing";
-    // 🚩 เรียกใช้ฟังก์ชันใหม่เพื่ออัปเดตจำนวนระเบิดเริ่มต้น
+    // เรียกใช้ฟังก์ชันใหม่เพื่ออัปเดตจำนวนระเบิดเริ่มต้น
     updateMinesDisplay(); 
 }
 
@@ -264,13 +299,9 @@ function renderGrid() {
             cellElement.dataset.row = r;
             cellElement.dataset.col = c;
             
-            // ผูกเหตุการณ์ PC: คลิกซ้าย/ขวา
+            // ผูกเหตุการณ์: คลิกซ้าย/ขวา
             cellElement.addEventListener('click', handleCellClick);
             cellElement.addEventListener('contextmenu', handleCellRightClick); 
-            
-            // 🚩 เพิ่ม: ผูกเหตุการณ์มือถือ: กดค้าง (Long Press)
-            cellElement.addEventListener('touchstart', handleTouchStart);
-            cellElement.addEventListener('touchend', handleTouchEnd);
             
             gridContainer.appendChild(cellElement);
         }
@@ -282,27 +313,35 @@ function renderGrid() {
  */
 function handleCellClick(event) {
     if (isGameOver) return;
-
+    
     const r = parseInt(event.target.dataset.row);
     const c = parseInt(event.target.dataset.col);
     const cell = board[r][c];
 
-    // 🚩 ตรวจสอบว่าช่องถูกปักธงไว้หรือไม่
-    if (cell.isRevealed || cell.isFlagged) return; 
+    // ถ้าช่องถูกเปิดแล้ว ให้ไม่ทำอะไร
+    if (cell.isRevealed) return; 
+
+    // 1. ตรวจสอบถ้าเป็นมือถือ ให้แสดงเมนู (Action Menu) แทนการเปิดช่องทันที
+    if (isMobileDevice() && !cell.isRevealed) {
+        // ป้องกันไม่ให้เกิดการเปิดช่องทันทีเมื่อแตะ
+        event.preventDefault(); 
+        hideActionMenu(); // ซ่อนเมนูเก่าก่อน
+        showActionMenu(r, c, event);
+        return;
+    }
+    
+    // 2. ถ้าเป็น PC หรือเป็นการคลิก "Dig" จากเมนู (โค้ดจะทำงานต่อจากตรงนี้)
+    // ตรวจสอบว่าช่องถูกปักธงไว้หรือไม่
+    if (cell.isFlagged) return; 
 
     // **ตรรกะการคลิกครั้งแรก (Safe First Click)**
     if (isFirstClick) {
-        // 1. วางระเบิดและคำนวณตัวเลข โดยใช้การตั้งค่าปัจจุบัน
         placeMinesAndCalculate(board, currentSettings.size, currentSettings.mines, r, c);
-        
-        // 2. เริ่มตัวจับเวลา
         startTimer();
-        
-        // 3. ตั้งค่าสถานะการคลิก
         isFirstClick = false; 
     }
 
-    // 1. ช่องเป็นระเบิด (ไม่ควรเกิดในการคลิกครั้งแรก)
+    // 1. ช่องเป็นระเบิด
     if (cell.isMine) {
         cell.isRevealed = true;
         gameOver(false); 
@@ -319,9 +358,10 @@ function handleCellClick(event) {
 
 /**
  * จัดการเมื่อมีการคลิกขวา (ปัก/ถอน ธง)
+ * **จำกัดจำนวนธงไม่ให้เกินจำนวนระเบิดทั้งหมด**
  */
 function handleCellRightClick(event) {
-    event.preventDefault(); 
+    event.preventDefault(); // ป้องกัน Context Menu ของเบราว์เซอร์
     if (isGameOver) return;
 
     const r = parseInt(event.target.dataset.row);
@@ -329,22 +369,30 @@ function handleCellRightClick(event) {
     const cell = board[r][c];
     const cellElement = event.target;
 
-    if (cell.isRevealed) return; 
+    if (cell.isRevealed) return; // ไม่สามารถปักธงบนช่องที่เปิดแล้ว
 
-    cell.isFlagged = !cell.isFlagged;
-    
-    // 🚩 อัปเดตจำนวนธงที่ปักแล้ว
-    if (cell.isFlagged) {
-        flagsPlaced++;
-        cellElement.textContent = '🚩';
-    } else {
+    // ตรรกะการปักธง
+    if (!cell.isFlagged) {
+        // ตรวจสอบ: ถ้าจำนวนธงที่ปักยังไม่เกินจำนวนระเบิดทั้งหมด
+        if (flagsPlaced < currentSettings.mines) { 
+            cell.isFlagged = true;
+            flagsPlaced++;
+            cellElement.textContent = '🚩';
+            cellElement.classList.add('flagged');
+        } else {
+            // ไม่ปักธง: จำนวนธงเต็มแล้ว
+            return; 
+        }
+    } 
+    // ตรรกะการถอนธง
+    else { 
+        cell.isFlagged = false;
         flagsPlaced--;
         cellElement.textContent = '';
+        cellElement.classList.remove('flagged');
     }
     
-    cellElement.classList.toggle('flagged', cell.isFlagged);
-    
-    // 🚩 อัปเดตการแสดงผลจำนวนระเบิดที่เหลือ
+    // อัปเดตการแสดงผลจำนวนระเบิดที่เหลือ
     updateMinesDisplay(); 
 }
 
@@ -358,7 +406,7 @@ function revealCell(r, c) {
     const cell = board[r][c];
     if (cell.isRevealed || cell.isMine) return;
     
-    // 🚩 ถ้าช่องถูกปักธงไว้ (isFlagged) ให้ถอนธงออกก่อนเปิด
+    // ถ้าช่องถูกปักธงไว้ (isFlagged) ให้ถอนธงออกก่อนเปิด
     if (cell.isFlagged) {
         cell.isFlagged = false; // ถอนธง
         flagsPlaced--; // ลดจำนวนธง
